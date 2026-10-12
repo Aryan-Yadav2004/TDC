@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Production Build
+client/dist/
+
+# SQLite Database files (generated on first boot)
+server/data/*.sqlite
+server/data/*.sqlite-wal
+server/data/*.sqlite-shm
+
+# Environment Variables
+.env
+.env.local
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
