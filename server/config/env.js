@@ -15,5 +15,7 @@ export const env = {
   DB_PATH: process.env.DB_PATH || path.resolve(__dirname, '../data/tdc.sqlite'),
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+  GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
   CORS_ORIGIN: process.env.CORS_ORIGIN || '*'
 };

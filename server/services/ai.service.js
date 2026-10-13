@@ -5,9 +5,7 @@ export const aiService = {
    * Generates a personalized concierge email pitch for the customer introducing the candidate.
    */
   async generateIntroPitch({ customer, candidate, matchmakerName = 'Priya Sharma', tone = 'warm_concierge' }) {
-    if (env.OPENAI_API_KEY) {
-      try {
-        const prompt = `
+    const prompt = `
 You are ${matchmakerName}, an elite, high-touch matchmaker at "The Date Crew" (TDC) in India.
 Write a personalized, elegant, and compelling match introduction email pitch to your client:
 Client: ${customer.first_name} ${customer.last_name} (${customer.age} yrs, ${customer.designation} at ${customer.company}, based in ${customer.city}).
@@ -24,6 +22,9 @@ Guidelines:
   "body": the email text (with paragraphs, professional greeting and sign-off).
 `;
 
+    // 1. Try OpenAI if key is configured
+    if (env.OPENAI_API_KEY) {
+      try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -51,16 +52,50 @@ Guidelines:
           };
         }
       } catch (err) {
-        console.warn('OpenAI API request failed, falling back to intelligent heuristic engine:', err.message);
+        console.warn('OpenAI API request failed, checking alternatives:', err.message);
       }
     }
 
-    // High-Fidelity Heuristic Generation Engine
+    // 2. Try Google Gemini if key is configured (Free from Google AI Studio)
+    if (env.GEMINI_API_KEY) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
+        const response = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: `${prompt}\nOutput strictly valid JSON with "subject" and "body" keys.` }]
+            }],
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            const parsed = JSON.parse(rawText);
+            return {
+              subject: parsed.subject,
+              body: parsed.body,
+              provider: 'Google Gemini 1.5 Flash (Free Tier)'
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Gemini API call failed, falling back to heuristic engine:', err.message);
+      }
+    }
+
+    // 3. Built-in High-Fidelity Heuristic Generation Engine (Zero cost, works 100% offline out-of-the-box!)
     return this.generateHeuristicPitch({ customer, candidate, matchmakerName, tone });
   },
 
   /**
-   * Generates a refined heuristic intro pitch when OpenAI is offline or without an API key.
+   * Generates a refined heuristic intro pitch when LLM APIs are offline or without an API key.
    */
   generateHeuristicPitch({ customer, candidate, matchmakerName, tone }) {
     const sharedInterests = (customer.interests || []).filter(i => (candidate.interests || []).includes(i));
@@ -105,9 +140,7 @@ Senior Concierge Matchmaker | The Date Crew (TDC)`;
    * Generates deep natural language reasoning explaining the match score.
    */
   async generateMatchReasoning({ customer, candidate, scoreBreakdown, strengths, watchouts }) {
-    if (env.OPENAI_API_KEY) {
-      try {
-        const prompt = `
+    const prompt = `
 As a senior matchmaker at The Date Crew, provide an analytical match briefing between:
 Client: ${customer.first_name} (${customer.gender}, ${customer.age} yrs, ${customer.designation} at ${customer.company}, City: ${customer.city}, Income: ₹${customer.income_lpa}LPA, Kids: ${customer.want_kids}, Diet: ${customer.diet})
 Candidate: ${candidate.first_name} (${candidate.gender}, ${candidate.age} yrs, ${candidate.designation} at ${candidate.company}, City: ${candidate.city}, Income: ₹${candidate.income_lpa}LPA, Kids: ${candidate.want_kids}, Diet: ${candidate.diet})
@@ -120,6 +153,8 @@ Provide JSON with:
 "conversationStarters": array of 3 thoughtful icebreaker topics tailored to both profiles.
 `;
 
+    if (env.OPENAI_API_KEY) {
+      try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -150,7 +185,35 @@ Provide JSON with:
       }
     }
 
-    // High-Fidelity Heuristic Reasoning
+    if (env.GEMINI_API_KEY) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
+        const response = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${prompt}\nRespond strictly with valid JSON.` }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            const parsed = JSON.parse(rawText);
+            return {
+              ...parsed,
+              provider: 'Google Gemini 1.5 Flash'
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Gemini reasoning failed:', err.message);
+      }
+    }
+
+    // High-Fidelity Heuristic Reasoning Fallback
     return {
       executiveSummary: `${candidate.first_name} and ${customer.first_name} exhibit an exceptional lifestyle and career synergy, combining high professional ambition with grounded family values.`,
       keySynergies: strengths.length > 0 ? strengths.slice(0, 3) : [
